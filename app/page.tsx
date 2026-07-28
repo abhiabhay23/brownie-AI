@@ -191,56 +191,67 @@ export default function Home() {
     }
   }, [messages, activeTab, isTyping]);
 
-  const handleSendMessage = () => {
-    if (!inputMessage.trim()) return;
+// Replace lines 174–218 with this updated handleSendMessage function:
+const handleSendMessage = async () => {
+  if (!inputMessage.trim() || isTyping) return;
 
-    const userText = inputMessage;
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      sender: "user",
-      text: userText,
+  const userText = inputMessage.trim();
+  const userMsg: Message = {
+    id: Date.now().toString(),
+    sender: "user",
+    text: userText,
+    timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  };
+
+  // 1. Immediately show user's message in UI & trigger quest progress
+  const updatedMessages = [...messages, userMsg];
+  setMessages(updatedMessages);
+  setInputMessage("");
+  setIsTyping(true);
+  incrementQuestProgress("chat");
+
+  try {
+    // 2. Format message history for API (mapping "bot" to "brownie" / "user" to "user")
+    const formattedHistory = messages.map((m) => ({
+      sender: m.sender === "user" ? "user" : "brownie",
+      text: m.text,
+    }));
+
+    // 3. Send request to your Next.js backend API
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: userText,
+        history: formattedHistory,
+      }),
+    });
+
+    const data = await res.json();
+
+    const botMsg: Message = {
+      id: (Date.now() + 1).toString(),
+      sender: "bot",
+      text: data.reply || "Woof! I'm having trouble thinking right now. 🐾",
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
-    setInputMessage("");
-    setIsTyping(true);
-    incrementQuestProgress("chat");
-
-    setTimeout(() => {
-      let replyText = "";
-      const lower = userText.toLowerCase();
-
-      if (lower.includes("hello") || lower.includes("hi") || lower.includes("hey")) {
-        replyText = "Tail wags! Hey there! Ready to play or get some treats? 🦴";
-      } else if (lower.includes("hungry") || lower.includes("food") || lower.includes("eat")) {
-        replyText = `My hunger is currently at ${stats.hunger}%. A juicy Gourmet Steak would be amazing right now! 🥩`;
-      } else if (lower.includes("how are you") || lower.includes("status")) {
-        replyText = `I'm feeling ${petMood}! Energy is at ${stats.energy}% and Happiness is at ${stats.happiness}%.`;
-      } else if (lower.includes("game") || lower.includes("play")) {
-        replyText = "Let's head over to the Minigames Arcade! I love playing Fetch Target Practice!";
-      } else {
-        const dynamicReplies = [
-          `That sounds fun! Being a Level ${stats.level} companion with you is the best! 🐶`,
-          "Woof woof! I love hanging out with you!",
-          "Did someone say treats? Tail wagging activated!",
-          "I'm all ears! Tell me more!",
-        ];
-        replyText = dynamicReplies[Math.floor(Math.random() * dynamicReplies.length)];
-      }
-
-      const botMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        sender: "bot",
-        text: replyText,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      };
-
-      setMessages((prev) => [...prev, botMsg]);
-      setIsTyping(false);
-      addXpAndCoins(10, 5);
-    }, 1000);
-  };
+    // 4. Append AI response & reward user
+    setMessages((prev) => [...prev, botMsg]);
+    addXpAndCoins(10, 5);
+  } catch (error) {
+    console.error("Error communicating with Brownie AI:", error);
+    const errorMsg: Message = {
+      id: (Date.now() + 1).toString(),
+      sender: "bot",
+      text: "Woof... my server connection dropped! Please try again.",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+    setMessages((prev) => [...prev, errorMsg]);
+  } finally {
+    setIsTyping(false);
+  }
+};
 
   // --- PAGE 3: HEALTH DIAGNOSTICS & VITALS ---
   const [activeDiag, setActiveDiag] = useState<"overall" | "hydration" | "mind" | "stamina">("overall");
@@ -1198,3 +1209,26 @@ export default function Home() {
     </div>
   );
 }
+{/* Dynamic Animated Health Metric Bar */}
+<div className="w-full bg-amber-100 h-4 rounded-full overflow-hidden p-0.5 shadow-inner">
+  <div 
+    className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full rounded-full transition-all duration-500 ease-out"
+    style={{ width: "${healthScore}%" }}
+  />
+</div>
+{/* Floating Avatar with Level-Up Glow */}
+<div className="relative flex justify-center items-center my-6">
+  <div className="brownie-avatar animate-brownie-idle relative z-10">
+    <img src="/brownie-pet.png" alt="Brownie" className="w-48 h-48 object-contain" />
+  </div>
+  {/* Soft Background Glow */}
+  <div className="absolute w-40 h-40 bg-amber-200/60 rounded-full blur-2xl -z-0" />
+</div>
+{/* Pet Bag Pantry Shelf Item */}
+<div className="pet-card p-4 flex flex-col items-center hover:scale-105 transition-transform duration-200 cursor-pointer">
+  <span className="text-3xl mb-1">🦴</span>
+  <span className="font-bold text-sm text-amber-900">Bone Treat</span>
+  <button className="btn-tactile text-xs mt-2 py-1 px-3">
+    Feed
+  </button>
+</div>
