@@ -45,3 +45,4 @@ reports/
 __pycache__/
 *.pyc
 .pytest_cache/
+/app/generated/prisma

@@ -1,0 +1,56 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String        @id // Clerk User ID
+  username      String        @unique
+  email         String        @unique
+  avatarUrl     String?       @db.Text
+  createdAt     DateTime      @default(now())
+  
+  sentRequests  Friendship[]  @relation("Sender")
+  receivedReqs  Friendship[]  @relation("Receiver")
+  interactions  Interaction[] @relation("Actor")
+  receivedInter Interaction[] @relation("Target")
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+model Friendship {
+  id          String           @id @default(cuid())
+  senderId    String
+  receiverId  String
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+
+  sender      User             @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver    User             @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+}
+
+model Interaction {
+  id          String   @id @default(cuid())
+  actorId     String
+  targetId    String
+  type        String   
+  message     String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  actor       User     @relation("Actor", fields: [actorId], references: [id], onDelete: Cascade)
+  target      User     @relation("Target", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([actorId])
+  @@index([targetId])
+}
