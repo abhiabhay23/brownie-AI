@@ -1,10 +1,8 @@
 import { Webhook } from 'svix';
 import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
-import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
@@ -43,19 +41,17 @@ export async function POST(req: Request) {
     const primaryEmail = email_addresses[0]?.email_address;
 
     if (primaryEmail) {
-      try {
-        await prisma.user.create({
-          data: {
-            id: id,
-            email: primaryEmail,
-            username: username || primaryEmail.split('@')[0],
-            avatarUrl: image_url || null,
-          },
-        });
-      } catch (dbErr) {
-        console.error('Database write error:', dbErr);
-        return new Response('Database error', { status: 500 });
-      }
+      // Dynamically import prisma to prevent build-time static evaluation
+      const { prisma } = await import('@/lib/prisma');
+
+      await prisma.user.create({
+        data: {
+          id: id,
+          email: primaryEmail,
+          username: username || primaryEmail.split('@')[0],
+          avatarUrl: image_url || null,
+        },
+      });
     }
   }
 
