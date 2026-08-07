@@ -3,16 +3,17 @@ import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 
+// ⚠️ FORCE NEXT.JS TO SKIP BUILD-TIME EVALUATION
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
   if (!WEBHOOK_SECRET) {
-    return new Response('WEBHOOK_SECRET is missing from environment variables', { status: 500 });
+    return new Response('WEBHOOK_SECRET is missing', { status: 500 });
   }
 
-  // Get headers from request
   const headerPayload = await headers();
   const svix_id = headerPayload.get("svix-id");
   const svix_timestamp = headerPayload.get("svix-timestamp");
@@ -22,7 +23,6 @@ export async function POST(req: Request) {
     return new Response('Missing svix headers', { status: 400 });
   }
 
-  // Get body
   const payload = await req.json();
   const body = JSON.stringify(payload);
 
@@ -39,26 +39,20 @@ export async function POST(req: Request) {
     return new Response('Invalid webhook signature', { status: 400 });
   }
 
-  const eventType = evt.type;
-
-  // Handle user creation
-  if (eventType === 'user.created') {
+  if (evt.type === 'user.created') {
     const { id, email_addresses, username, image_url } = evt.data;
     const primaryEmail = email_addresses[0]?.email_address;
 
-    if (!primaryEmail) {
-      return new Response('No email provided', { status: 400 });
+    if (primaryEmail) {
+      await prisma.user.create({
+        data: {
+          id: id,
+          email: primaryEmail,
+          username: username || primaryEmail.split('@')[0],
+          avatarUrl: image_url || null,
+        },
+      });
     }
-
-    // Save user to Neon PostgreSQL via Prisma
-    await prisma.user.create({
-      data: {
-        id: id,
-        email: primaryEmail,
-        username: username || primaryEmail.split('@')[0],
-        avatarUrl: image_url || null,
-      },
-    });
   }
 
   return new Response('Webhook processed successfully', { status: 200 });
