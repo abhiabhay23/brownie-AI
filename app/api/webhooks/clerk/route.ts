@@ -3,9 +3,8 @@ import { headers } from 'next/headers';
 import { WebhookEvent } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 
-// ⚠️ FORCE NEXT.JS TO SKIP BUILD-TIME EVALUATION
 export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
@@ -44,14 +43,19 @@ export async function POST(req: Request) {
     const primaryEmail = email_addresses[0]?.email_address;
 
     if (primaryEmail) {
-      await prisma.user.create({
-        data: {
-          id: id,
-          email: primaryEmail,
-          username: username || primaryEmail.split('@')[0],
-          avatarUrl: image_url || null,
-        },
-      });
+      try {
+        await prisma.user.create({
+          data: {
+            id: id,
+            email: primaryEmail,
+            username: username || primaryEmail.split('@')[0],
+            avatarUrl: image_url || null,
+          },
+        });
+      } catch (dbError) {
+        console.error('Database insertion error:', dbError);
+        return new Response('Database error', { status: 500 });
+      }
     }
   }
 
