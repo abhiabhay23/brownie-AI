@@ -14,9 +14,9 @@ export async function POST(req: Request) {
   }
 
   const headerPayload = await headers();
-  const svix_id = headerPayload.get("svix-id");
-  const svix_timestamp = headerPayload.get("svix-timestamp");
-  const svix_signature = headerPayload.get("svix-signature");
+  const svix_id = headerPayload.get('svix-id');
+  const svix_timestamp = headerPayload.get('svix-timestamp');
+  const svix_signature = headerPayload.get('svix-signature');
 
   if (!svix_id || !svix_timestamp || !svix_signature) {
     return new Response('Missing svix headers', { status: 400 });
@@ -30,9 +30,9 @@ export async function POST(req: Request) {
 
   try {
     evt = wh.verify(body, {
-      "svix-id": svix_id,
-      "svix-timestamp": svix_timestamp,
-      "svix-signature": svix_signature,
+      'svix-id': svix_id,
+      'svix-timestamp': svix_timestamp,
+      'svix-signature': svix_signature,
     }) as WebhookEvent;
   } catch (err) {
     return new Response('Invalid webhook signature', { status: 400 });
@@ -52,8 +52,8 @@ export async function POST(req: Request) {
             avatarUrl: image_url || null,
           },
         });
-      } catch (dbError) {
-        console.error('Database insertion error:', dbError);
+      } catch (dbErr) {
+        console.error('Database write error:', dbErr);
         return new Response('Database error', { status: 500 });
       }
     }
