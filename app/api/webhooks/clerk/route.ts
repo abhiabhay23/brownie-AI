@@ -8,6 +8,7 @@ export async function POST(req: Request) {
   const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
 
   if (!WEBHOOK_SECRET) {
+    console.error('Missing WEBHOOK_SECRET');
     return new Response('WEBHOOK_SECRET is missing', { status: 500 });
   }
 
@@ -33,25 +34,40 @@ export async function POST(req: Request) {
       'svix-signature': svix_signature,
     }) as WebhookEvent;
   } catch (err) {
+    console.error('Verification failed:', err);
     return new Response('Invalid webhook signature', { status: 400 });
   }
 
   if (evt.type === 'user.created') {
-    const { id, email_addresses, username, image_url } = evt.data;
+    const { id, email_addresses, username, first_name, image_url } = evt.data;
     const primaryEmail = email_addresses[0]?.email_address;
 
     if (primaryEmail) {
-      // Dynamically import prisma to prevent build-time static evaluation
-      const { prisma } = await import('@/lib/prisma');
+      try {
+        const { prisma } = await import('@/lib/prisma');
 
-      await prisma.user.create({
-        data: {
-          id: id,
-          email: primaryEmail,
-          username: username || primaryEmail.split('@')[0],
-          avatarUrl: image_url || null,
-        },
-      });
+        // Safe fallback for username if not provided during sign-up
+        const fallbackUsername = username || first_name || primaryEmail.split('@')[0];
+
+        await prisma.user.upsert({
+          where: { id: id },
+          update: {
+            email: primaryEmail,
+            username: fallbackUsername,
+            avatarUrl: image_url || null,
+          },
+          create: {
+            id: id,
+            email: primaryEmail,
+            username: fallbackUsername,
+            avatarUrl: image_url || null,
+          },
+        });
+        console.log(`User ${id} synced successfully to Neon.`);
+      } catch (dbErr) {
+        console.error('Prisma Error during webhook:', dbErr);
+        return new Response('Database insertion error', { status: 500 });
+      }
     }
   }
 
